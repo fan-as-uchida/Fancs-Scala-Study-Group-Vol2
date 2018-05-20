@@ -35,10 +35,9 @@ F@N Communications, Inc.
 
 ## Arrows
 
-高パフォーマンスなArrowとTask型を提供する
-
-
-FutureをArrow/Taskに置き換えることでスループットを高めることができる
+- 高パフォーマンスなArrowとTask
+- Arrow & Task = 再利用可能な計算を表す型
+- Futureから移行しやすい
 
 ---
 
@@ -82,7 +81,8 @@ import arrows.twitter._
 ```
 
 
-両方とも似たような動きをするが、インターフェースがそれぞれのFutureに合わせてある
+- ベースとしている`Future`が違う
+- 移行しやすいようにI/Fが合わせてある
 
 ```scala
 import scala.concurrent.Future
@@ -91,7 +91,12 @@ import arrows.stdlib._
 // Scala Future
 Future.successful("foo")
 Task.successful("foo")
+
+Future.failed(new Exception)
+Task.failed(new Exception)
 ```
+
+<!-- .element: class="fragment" -->
 
 ```scala
 import com.twitter.util.Future
@@ -100,10 +105,15 @@ import arrows.twitter._
 // Twitter Future
 Future.value("foo")
 Task.value("foo")
+
+Future.exception(new Exception)
+Task.exception(new Exception)
 ```
 
+<!-- .element: class="fragment" -->
+
 Note:
-- 今日はarrows-twitterを使って説明したいと思います
+- join, collectなど他のメソッドもあります
 
 
 
@@ -113,9 +123,9 @@ Note:
 
 ## Arrow[T, U]
 
-- 引数を1つ取り1つ値を返す再利用可能な計算
-- runするまで計算は行われない(lazy)
-- andThenで結合可能
+- <!-- .element: class="fragment" --> 引数を1つ取り1つ値を返す計算
+- <!-- .element: class="fragment" --> runするまで計算は行われない(lazy)
+- <!-- .element: class="fragment" --> andThenで結合可能
 
 
 ### Arrowの作り方
@@ -127,13 +137,17 @@ import arrows.twitter._
 val identityArrow: Arrow[Int, Int] = Arrow[Int]
 ```
 
+<!-- .element: class="fragment" -->
+
 ```scala
 val stringify: Arrow[Int, String]
   = Arrow[Int].map(_.toString)
 ```
 
+<!-- .element: class="fragment" -->
+
 Note:
-- Arrow.applyとmapを使うことでArrowの計算を定義できる
+- Arrow.applyとmapを使うことで`Arrow`の計算を定義できる
 - Identity arrowはそのままでは役に立たないが、新しいArrowを作るためのスターティングポイントとして役に立つ
 
 
@@ -144,14 +158,18 @@ Note:
 val stringify: Arrow[Int, String]
   = Arrow[Int].map(_.toString)
 
-// runするとFutureを返す(=計算が始まる)
+// runするとFutureを返す
 val fut1: Future[String] = stringify.run(123)
 ```
+
+<!-- .element: class="fragment" -->
 
 ```scala
 // Arrowはただの計算なので再利用が可能
 val fut2: Future[String] = stringify.run(321)
 ```
+
+<!-- .element: class="fragment" -->
 
 
 ### andThenでArrow同士を結合
@@ -179,9 +197,9 @@ Note:
 
 ## Task[T]
 
-- cats-effect, Scalaz, Monixなどの`IO`,`Task`と同等
-- 値を1つ返す計算(引数はない)
-- 入力のないArrow
+- <!-- .element: class="fragment" --> cats-effect, Scalaz, Monixなどの`IO`,`Task`と同等
+- <!-- .element: class="fragment" --> 値を1つ返す計算
+- <!-- .element: class="fragment" --> 入力値のないArrow
 
 
 ### TaskはArrowの型エイリアス
@@ -195,7 +213,7 @@ package object twitter {
 ```
 
 
-### Task.apply and Task.value
+### Taskの作り方
 
 ```scala
 import arrows.twitter._
@@ -204,20 +222,24 @@ val random: Task[Int] = Task {
   scala.util.Random.nextInt(100)
 }
 
-val fut: Future[Int] = task.run()
+val fut: Future[Int] = random.run()
 ```
+
+<!-- .element: class="fragment" -->
 
 ```scala
 // 既に計算された値にはvalueを使う
 val one = Task.value(1)
 ```
 
+<!-- .element: class="fragment" -->
+
 Note:
 - catsのpure(Applicative)とdelay(Sync)
 
 
 
-### Task.async
+### Async
 
 ```scala
 def performSomeAsyncSideEffect: Future[Unit] = ???
@@ -225,18 +247,26 @@ def performSomeAsyncSideEffect: Future[Unit] = ???
 Task.async(performSomeAsyncSideEffect())
 ```
 
+<!-- .element: class="fragment" -->
+
+- cats-effectのAsyncと違って`f: => Future[T]`を引数に取る
+
+<!-- .element: class="fragment" -->
+
 ```scala
 // Bad practice
 val fut = performSomeAsyncSideEffect()
 Task.async(fut)
 ```
 
+<!-- .element: class="fragment" -->
+
 Note:
 - asyncはcall-by-nameでパラメータを受け取るので、実際にはperformSomeAsyncSideEffectは評価されない
 
 ---
 
-### Arrow.flatMap
+### flatMap
 
 ```scala
 final def flatMap[V](f: U => Task[V]): Arrow[T, V] =
@@ -250,12 +280,11 @@ final def flatMap[V](f: U => Task[V]): Arrow[T, V] =
 - TaskはMonadだけどArrowはMonadではない
 
 
-### flatMapは処理の分岐などに利用
+### 処理の分岐などに使用
 
 ```scala
 import arrows.twitter._
 
-// サービスの呼び出し
 val callServiceA = Arrow[Int].map(_ * 2)
 val callServiceB = Arrow[Int].map(_ + 1)
 
@@ -272,79 +301,85 @@ val result: Future[Int] = myArrow.run(1)
 ### for comprehension
 
 ```scala
+val taskA: Task[Int] = Task.value(1)
+val taskB: Task[Int] = Task.value(2)
+val taskC: Task[Int] = Task.value(3)
+
+val myTask: Task[Int] = 
+  for {
+    a <- taskA
+    b <- taskB
+    c <- taskC
+  } yield a + b + c
+```
+
+
+```scala
 val callServiceA: Arrow[Int, Int] = Arrow[Int].map(_ + 1)
 val callServiceB: Arrow[Int, Int] = Arrow[Int].map(_ * 2)
 val callServiceC: Arrow[Int, Int] = Arrow[Int].map(_ - 1)
 
-val myArrow: Arrow[Int, Int] = 
+val myArrow: Arrow[Int, Int] =
   for {
     a <- callServiceA
     b <- callServiceB(a)
     c <- callServiceC(b)
   } yield c
+```
 
-// ただ順番にArrowを実行すれば良い場合はandThenを使った方が効率的
-val myArrow: Arrow[Int, Int] = 
-  callServiceA.andThen(callServiceB).andThen(callServiceC)
+```
+// andThenの方が処理効率が良い
+callServiceA
+  .andThen(callServiceB)
+  .andThen(callServiceC)
 ```
 
 ---
 
-## 利用例
-
-IPを国に変換するAPIをarrowsとfinchで書いてみる
-
+## Arrow vs Task
 
 ```scala
-final case class Country(name: String, code: String)
-
-trait Database {
-  def lookup(ip: InetAddress): Country
-}
+val myArrow = arrow.andThen(arrow).andThen(arrow)
 ```
 
-
-### Arrowを作る
+<!-- .element: class="fragment" -->
 
 ```scala
-// キャッシュされた最新のデータベースを取得
-val getInMemoryDb: Task[Database] = ???
-
-// IPアドレスとDBから国を判定
-val lookup: Arrow[(InetAddress, Database), Country] =
-  Arrow[(InetAddress, Database)].map {
-    case (ip, db) => db.lookup(ip)
-  }
-
-// IPアドレスを国に変換するArrowを作る
-val ip2Country: Arrow[InetAddress, Output[Country]] =
-  Arrow[InetAddress]
-    .join(getInMemoryDb)
-    .andThen(lookup)
-    .map(Ok)
+val myArrow = for {
+  a <- arrow
+  b <- arrow(a)
+  c <- arrow(b)
+} yield c
 ```
 
+<!-- .element: class="fragment" -->
 
 ```scala
-// /country?ip=8.8.8.8
-val endpoint: Endpoint[Country] =
-  get("country" :: param[InetAddress]("ip")) {
-    (ip: InetAddress) =>
-    ip2Country.run(ip) // Future[Output[Country]]
-  }
+private def task(x: Int): Task[Int] = Task { x + 1 }
+
+private def taskFor(x: Int): Task[Int] =
+  for {
+    a <- task(x)
+    b <- task(a)
+    c <- task(b)
+  } yield c
 ```
+
+<!-- .element: class="fragment" -->
+
+
+```
+                Mode  Cnt         Score         Error  Units
+benchAndThen   thrpt    3  27916962.060 ± 5166918.793  ops/s
+benchArrowFor  thrpt    3  12747120.128 ± 4454238.242  ops/s
+benchTaskFor   thrpt    3   9832552.072 ± 2459368.235  ops/s
+```
+
+https://gist.github.com/rider-yi/7741533126f522bc931cfaaaf7f3ddfe
 
 ---
 
-## cats-effect integration
-
-- 現状ない😢
-- サブモジュールで提供予定らしい(現在開発中?)
-- MonadError, Syncくらいなら簡単につくれる
-
----
-
-## ベンチマーク結果
+## Arrows vs Future
 
 
 ### Scala Future x Arrows Stdlib (Async)
@@ -384,6 +419,10 @@ Note:
 
 ![sync-thrpt-twitter](./images/sync-thrpt-twitter.png)
 
+---
+
+### Arrows vs Other libraries
+
 
 ## Other libraries x Arrows (Async)
 
@@ -399,7 +438,7 @@ Note:
 ![sync-thrpt-others](./images/sync-thrpt-others.png)
 
 
-- Arrowは他のソリューションより高パフォーマンスな傾向
+- Arrowは他のライブラリより高パフォーマンス
 - Taskはちょっとだけ良い
 
 ---
@@ -421,4 +460,14 @@ val callService: Arrow[Int, Unit] = Arrow[Int].map { ... }
 
 ---
 
+## cats-effect integration
+
+- 現状ない😢
+- サブモジュールで提供予定らしい(現在開発中?)
+- MonadError, Syncくらいなら簡単につくれる
+
+---
+
 ## ありがとうございました
+
+- https://rider-yi.github.io/Fancs-Scala-Study-Group-Vol2/
