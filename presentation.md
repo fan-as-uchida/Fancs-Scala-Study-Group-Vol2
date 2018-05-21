@@ -445,7 +445,7 @@ Note:
 
 ## `Future`からの移行
 
-- `Future`と`Task`はI/Fが似ているのでとりあえず全部Task化
+- `Future`と`Task`はI/Fが似ているのでとりあえず全部`Task`化
   - READMEにScalafixのルールがある
 
 - 後で可能な部分は全てArrow化する
