@@ -12,15 +12,15 @@ F@N Communications, Inc.
 
 - ファンコミ入社4年目
 
+- プログラマ歴11年, Scala歴3年
+
 - nend, nex8, viidleの配信システムをScalaで開発
 
 - ScalaCache, sttp, refinedとかのメンテナンス
 
 - バイク好き🏍
 
-- Twitter: @rider_yi
-
-- GitHub: rider-yi
+- Twitter: @rider_yi / GitHub: rider-yi
 
 ---
 
@@ -35,9 +35,13 @@ F@N Communications, Inc.
 
 ## Arrows
 
-- 高パフォーマンスなArrowとTask
-- Arrow & Task = 再利用可能な計算を表す型
-- Futureから移行しやすい
+高パフォーマンスなArrowとTaskを提供するだけの軽量ライブラリ
+
+
+## Arrow & Task
+
+- 再利用可能な計算を表す型
+- Futureをベースにしている
 
 ---
 
@@ -81,7 +85,7 @@ import arrows.twitter._
 ```
 
 
-- ベースとしている`Future`が違う
+- それぞれベースとしている`Future`が違う
 - 移行しやすいようにI/Fが合わせてある
 
 ```scala
@@ -124,7 +128,7 @@ Note:
 ## Arrow[T, U]
 
 - <!-- .element: class="fragment" --> 引数を1つ取り1つ値を返す計算
-- <!-- .element: class="fragment" --> runするまで計算は行われない(lazy)
+- <!-- .element: class="fragment" --> runすると計算が実行される
 - <!-- .element: class="fragment" --> andThenで結合可能
 
 
@@ -181,12 +185,12 @@ val callServiceC: Arrow[Int, Int] = Arrow[Int].map(_ - 1)
 ```
 
 ```scala
-val myArrow: Arrow[Int, Unit] =
+val myArrow: Arrow[Int, Int] =
   callServiceA
     .andThen(callServiceB)
     .andThen(callServiceC)
 
-val fut = myArrow.run(5)
+val fut: Future[Int] = myArrow.run(5)
 Await.result(fut) // 11
 ```
 
@@ -199,6 +203,7 @@ Note:
 
 - <!-- .element: class="fragment" --> cats-effect, Scalaz, Monixなどの`IO`,`Task`と同等
 - <!-- .element: class="fragment" --> 値を1つ返す計算
+- <!-- .element: class="fragment" --> runするまで実行されない(lazy)
 - <!-- .element: class="fragment" --> 入力値のないArrow
 
 
@@ -218,6 +223,7 @@ package object twitter {
 ```scala
 import arrows.twitter._
 
+// runするまで実行されない
 val random: Task[Int] = Task {
   scala.util.Random.nextInt(100)
 }
@@ -242,14 +248,17 @@ Note:
 ### Async
 
 ```scala
-def performSomeAsyncSideEffect: Future[Unit] = ???
-
-Task.async(performSomeAsyncSideEffect())
+// arrows
+def async[T](f: => Future[T]): Task[T]
 ```
 
 <!-- .element: class="fragment" -->
 
-- cats-effectのAsyncと違って`f: => Future[T]`を引数に取る
+```scala
+def performSomeAsyncSideEffect: Future[Unit] = ???
+
+Task.async(performSomeAsyncSideEffect())
+```
 
 <!-- .element: class="fragment" -->
 
@@ -280,8 +289,6 @@ final def flatMap[V](f: U => Task[V]): Arrow[T, V] =
 - TaskはMonadだけどArrowはMonadではない
 
 
-### 処理の分岐などに使用
-
 ```scala
 import arrows.twitter._
 
@@ -305,7 +312,7 @@ val taskA: Task[Int] = Task.value(1)
 val taskB: Task[Int] = Task.value(2)
 val taskC: Task[Int] = Task.value(3)
 
-val myTask: Task[Int] = 
+val myTask: Task[Int] =
   for {
     a <- taskA
     b <- taskB
@@ -464,10 +471,12 @@ val callService: Arrow[Int, Unit] = Arrow[Int].map { ... }
 
 - 現状ない😢
 - サブモジュールで提供予定らしい(現在開発中?)
-- MonadError, Syncくらいなら簡単につくれる
+- TaskのMonadErrorくらいなら簡単につくれる
+  - catbirdのコードを持ってくるとか
 
 ---
 
 ## ありがとうございました
 
-- https://rider-yi.github.io/Fancs-Scala-Study-Group-Vol2/
+https://rider-yi.github.io/Fancs-Scala-Study-Group-Vol2/
+
